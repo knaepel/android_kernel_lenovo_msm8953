@@ -224,3 +224,41 @@
 	/delete-property/ qcom,external-typec;
 	/delete-property/ qcom,typec-psy-name;
 };
+
+/*
+ * Lenovo's bootloader reads the reboot reason (bootloader, recovery, ...)
+ * from IMEM only. With store-hard-reset-reason the kernel would do a cold
+ * reset and keep the reason in the PMIC, so "reboot bootloader" ended in a
+ * normal boot. Same PON setup as Lenovo's 3.18 kernel.
+ */
+&spmi_bus {
+	qcom,pm8953@0 {
+		qcom,power-on@800 {
+			/delete-property/ qcom,store-hard-reset-reason;
+
+			qcom,pon_1 {
+				qcom,support-reset = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <7>;
+			};
+		};
+	};
+};
+
+/* Parts of the QRD reference board the TB-X704 does not have */
+&i2c_5 {
+	nq@28 {
+		status = "disabled";
+	};
+};
+
+&i2c_2 {
+	wsa881x-i2c-codec@f {
+		status = "disabled";
+	};
+
+	wsa881x-i2c-codec@45 {
+		status = "disabled";
+	};
+};
