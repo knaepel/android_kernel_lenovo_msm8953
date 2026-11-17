@@ -410,6 +410,11 @@ static u8 gtp_get_points(struct goodix_ts_data *ts,
 
 		if (ts->pdata->swap_x2y)
 			GTP_SWAP(points[i].x, points[i].y);
+		/* sizes are already swapped at init when swap-x2y is set */
+		if (ts->pdata->invert_x && points[i].x <= ts->pdata->abs_size_x)
+			points[i].x = ts->pdata->abs_size_x - points[i].x;
+		if (ts->pdata->invert_y && points[i].y <= ts->pdata->abs_size_y)
+			points[i].y = ts->pdata->abs_size_y - points[i].y;
 
 		dev_dbg(&ts->client->dev, "[%d][%d %d %d]\n",
 			points[i].id, points[i].x, points[i].y, points[i].p);
@@ -1755,6 +1760,8 @@ static int gtp_parse_dt(struct device *dev,
 		dev_info(dev, "driver-send-cfg enabled\n");
 
 	of_property_read_u32(np, "goodix,swap-x2y", &pdata->swap_x2y);
+	of_property_read_u32(np, "goodix,invert-x", &pdata->invert_x);
+	of_property_read_u32(np, "goodix,invert-y", &pdata->invert_y);
 	if (pdata->swap_x2y)
 		dev_info(dev, "swap-x2y enabled\n");
 
