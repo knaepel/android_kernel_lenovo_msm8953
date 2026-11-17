@@ -366,6 +366,47 @@ static int mdss_dsi_regulator_init(struct platform_device *pdev,
 	return rc;
 }
 
+/*
+ * Lenovo TB-X704: the panel is powered through two board GPIOs (power enable
+ * and level shifter) in addition to the regular supplies. Both are optional
+ * and only used when the DT names them.
+ */
+static int lcd_power_en_gpio = -EINVAL;
+static int lcd_level_shift_gpio = -EINVAL;
+
+static void mdss_dsi_parse_lenovo_lcd_gpios(struct device_node *np)
+{
+	int gpio;
+
+	gpio = of_get_named_gpio(np, "qcom,platform-power-en-gpio", 0);
+	if (gpio_is_valid(gpio) && !gpio_request(gpio, "lcd_power_en"))
+		lcd_power_en_gpio = gpio;
+
+	gpio = of_get_named_gpio(np, "qcom,platform-lcd-level-shift-en-gpio", 0);
+	if (gpio_is_valid(gpio) && !gpio_request(gpio, "lcd_level_shift_en"))
+		lcd_level_shift_gpio = gpio;
+}
+
+static void mdss_dsi_lenovo_lcd_gpios_set(bool on)
+{
+	if (on) {
+		if (gpio_is_valid(lcd_power_en_gpio))
+			gpio_direction_output(lcd_power_en_gpio, 1);
+		if (gpio_is_valid(lcd_level_shift_gpio))
+			gpio_direction_output(lcd_level_shift_gpio, 1);
+		return;
+	}
+
+	if (gpio_is_valid(lcd_level_shift_gpio))
+		gpio_direction_output(lcd_level_shift_gpio, 0);
+	mdelay(5);
+	if (gpio_is_valid(lcd_power_en_gpio)) {
+		gpio_direction_output(lcd_power_en_gpio, 0);
+		/* panel needs time to discharge before the next power on */
+		msleep(400);
+	}
+}
+
 static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 {
 	int ret = 0;
@@ -404,6 +445,8 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 		pr_err("%s: failed to disable vregs for %s\n",
 			__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
 
+	mdss_dsi_lenovo_lcd_gpios_set(false);
+
 end:
 	return ret;
 }
@@ -420,6 +463,10 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
+
+	/* with continuous splash the bootloader already powered the panel */
+	if (!pdata->panel_info.cont_splash_enabled)
+		mdss_dsi_lenovo_lcd_gpios_set(true);
 
 	if (gpio_is_valid(ctrl_pdata->vdd_ext_gpio)) {
 		ret = gpio_direction_output(
@@ -4228,6 +4275,8 @@ static int mdss_dsi_parse_gpio_params(struct platform_device *ctrl_pdev,
 					__func__, __LINE__);
 		pdata->panel_en_gpio = ctrl_pdata->disp_en_gpio;
 	}
+
+	mdss_dsi_parse_lenovo_lcd_gpios(ctrl_pdev->dev.of_node);
 
 	ctrl_pdata->disp_te_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 		"qcom,platform-te-gpio", 0);
