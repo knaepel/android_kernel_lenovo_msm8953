@@ -210,3 +210,17 @@
 &apps_iommu {
 	qcom,legacy-tz-pt-format;
 };
+
+/*
+ * USB-C is handled by an external FUSB302, the PMIC Type-C block is not
+ * wired. Its "typec" supply reports 0 mA, which the charger would take as
+ * input current limit for every non-SDP port. Use BC 1.2 detection instead.
+ */
+&pm8953_typec {
+	status = "disabled";
+};
+
+&qpnp_smbcharger {
+	/delete-property/ qcom,external-typec;
+	/delete-property/ qcom,typec-psy-name;
+};
