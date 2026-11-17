@@ -1,0 +1,212 @@
+/*
+ * Lenovo TAB4 10 Plus (TB-X704F/L)
+ *
+ * Board description on top of the msm8953 QRD SKU3 reference, ported from
+ * Lenovo's 3.18 kernel (arch/arm/boot/dts/qcom/tbx704/).
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include "dsi-panel-nt51021b-inx-wuxga-video.dtsi"
+#include "dsi-panel-nt51021bboe-inx-wuxga-video.dtsi"
+
+/ {
+	model = "Lenovo TAB4 10 Plus (TB-X704)";
+	compatible = "lenovo,tbx704", "qcom,msm8953-qrd-sku3",
+		     "qcom,msm8953-qrd", "qcom,msm8953", "qcom,qrd";
+
+	/* values the Lenovo bootloader matches on */
+	qcom,msm-id = <293 0x0>, <304 0x0>;
+	qcom,board-id = <0x0b 0>;
+	/delete-property/ qcom,pmic-id;
+
+	qcom,battery-data {
+		qcom,batt-id-range-pct = <15>;
+		#include "Huaqin_A609x_7000mAh_averaged_MasterSlave.dtsi"
+		#include "Huaqin_A609x_7000mAh_averaged_SecondSlave.dtsi"
+	};
+
+	reserved-memory {
+		/* pstore: keeps the last kernel log across a reboot */
+		ramoops@8ee00000 {
+			compatible = "ramoops";
+			reg = <0x0 0x8ee00000 0x0 0x80000>;
+			record-size = <0x5000>;
+			console-size = <0x40000>;
+			pmsg-size = <0x20000>;
+			ftrace-size = <0x15000>;
+		};
+	};
+};
+
+/* Lenovo's TrustZone layout reserves more memory below the modem region */
+&other_ext_mem {
+	reg = <0x0 0x83b00000 0x0 0x2d00000>;
+};
+
+&qcom_seecom {
+	reg = <0x83b00000 0x2800000>;
+};
+
+/* vsmart panels in the shared panel list need a PMI632 we do not have */
+&mdss_mdp {
+	/delete-node/ qcom,mdss_dsi_ft8006p_hlt_1600_video;
+	/delete-node/ qcom,mdss_dsi_ft8006p_truly_1600_video;
+	/delete-node/ qcom,mdss_dsi_icnl9911s_byd_1600_video;
+};
+
+/* Display: Novatek NT51021B, 1200x1920 video mode, INX or BOE glass */
+&mdss_dsi0 {
+	vdd-supply = <&pm8953_l17>;
+	qcom,dsi-pref-prim-pan = <&dsi_nt51021b_inx_wuxga_vid>;
+	qcom,platform-power-en-gpio = <&tlmm 16 0>;
+	qcom,platform-lcd-level-shift-en-gpio = <&tlmm 17 0>;
+};
+
+&dsi_nt51021b_inx_wuxga_vid {
+	qcom,mdss-dsi-panel-timings-phy-v2 = [24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 1d 08 0a 05 03 04 a0];
+};
+
+&dsi_nt51021bboe_inx_wuxga_vid {
+	qcom,mdss-dsi-panel-timings-phy-v2 = [24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 20 08 0a 05 03 04 a0
+		24 1d 08 0a 05 03 04 a0];
+};
+
+/* Backlight */
+&wled {
+	qcom,fs-curr-ua = <22500>;
+	qcom,led-strings-list = [00 01 02 03];
+	/delete-property/ qcom,en-ext-pfet-sc-pro;
+};
+
+/* Touchscreen: Goodix GT9110P */
+&i2c_3 {
+	/delete-node/ synaptics@4b;
+
+	goodix_ts@5d {
+		compatible = "goodix,gt9xx";
+		status = "okay";
+		reg = <0x5d>;
+		vdd_ana-supply = <&pm8953_l10>;
+		vcc_i2c-supply = <&pm8953_l6>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <65 0x2008>;
+		pinctrl-names = "gdix_ts_int_default", "gdix_ts_int_output_low",
+			"gdix_ts_int_output_high", "gdix_ts_int_input",
+			"gdix_ts_rst_default", "gdix_ts_rst_output_low",
+			"gdix_ts_rst_output_high", "gdix_ts_rst_input";
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-1 = <&ts_int_output_low>;
+		pinctrl-2 = <&ts_int_output_high>;
+		pinctrl-3 = <&ts_int_input>;
+		pinctrl-4 = <&ts_rst_default>;
+		pinctrl-5 = <&ts_rst_output_low>;
+		pinctrl-6 = <&ts_rst_output_high>;
+		pinctrl-7 = <&ts_rst_input>;
+
+		reset-gpios = <&tlmm 64 0x00>;
+		irq-gpios = <&tlmm 65 0x2008>;
+		irq-flags = <2>;
+
+		touchscreen-max-id = <10>;
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <1920>;
+		touchscreen-max-w = <1024>;
+		touchscreen-max-p = <1024>;
+
+		/* the controller keeps its factory config; do not overwrite it */
+		goodix,type-a-report = <0>;
+		goodix,driver-send-cfg = <0>;
+		goodix,auto-update-cfg = <0>;
+		goodix,auto-update = <0>;
+		goodix,esd-protect = <1>;
+		goodix,resume-in-workqueue = <0>;
+		goodix,int-sync = <1>;
+		/* Lenovo: panel is mounted portrait, the tablet is used landscape */
+		goodix,swap-x2y = <1>;
+		goodix,invert-x = <1>;
+		goodix,invert-y = <0>;
+		goodix,power-off-sleep = <0>;
+		goodix,pen-suppress-finger = <0>;
+	};
+};
+
+/* Charger and fuel gauge (PMI8950, 7000 mAh dual cell) */
+&qpnp_smbcharger {
+	qcom,iterm-ma = <256>;
+	qcom,float-voltage-mv = <4400>;
+	qcom,resume-delta-mv = <100>;
+	qcom,fastchg-current-comp = <700>;
+	qcom,float-voltage-comp = <9>;
+	qcom,thermal-mitigation = <3000 2500 2000 2000 2000 2000 2000>;
+	/delete-property/ qcom,parallel-usb-min-current-ma;
+	/delete-property/ qcom,parallel-usb-9v-min-current-ma;
+	/delete-property/ qcom,parallel-allowed-lowering-ma;
+};
+
+&qpnp_fg {
+	qcom,resume-soc = <99>;
+	qcom,fg-iterm-ma = <270>;
+	qcom,fg-chg-iterm-ma = <256>;
+	qcom,fg-cutoff-voltage-mv = <3380>;
+	qcom,esr-pulse-tuning-en;
+	qcom,thermal-coefficients = [DA 86 F0 50 08 3C];
+	qcom,cold-bat-decidegc = <(-20)>;
+	qcom,cool-bat-decidegc = <150>;
+	qcom,warm-bat-decidegc = <450>;
+	qcom,hot-bat-decidegc = <520>;
+	qcom,cold-hot-jeita-hysteresis = <15 45>;
+};
+
+&usb3 {
+	vbus_dwc3-supply = <&smbcharger_charger_otg>;
+};
+
+/* microSD card detect */
+&sdhc_2 {
+	cd-gpios = <&tlmm 133 0x0>;
+};
+
+/* Lenovo leaves out the external codec; audio runs on the internal codec */
+&ext_codec {
+	status = "disabled";
+};
+
+&wcd9335 {
+	status = "disabled";
+};
+
+&wcd9xxx_intc {
+	status = "disabled";
+};
+
+&wcd_rst_gpio {
+	status = "disabled";
+};
+
+&slim_msm {
+	status = "disabled";
+};
+
+&dai_slim {
+	status = "disabled";
+};
+
+&clock_audio {
+	status = "disabled";
+};
+
+/* Lenovo's Android 7 TrustZone cannot switch static context banks to AArch64 */
+&apps_iommu {
+	qcom,legacy-tz-pt-format;
+};
