@@ -132,9 +132,13 @@
 		goodix,esd-protect = <1>;
 		goodix,resume-in-workqueue = <0>;
 		goodix,int-sync = <1>;
-		/* Lenovo: panel is mounted portrait, the tablet is used landscape */
-		goodix,swap-x2y = <1>;
-		goodix,invert-x = <1>;
+		/*
+		 * Android uses the panel in its native portrait orientation, like
+		 * Lenovo's stock kernel. (TWRP for X704F instead needs swap-x2y and
+		 * invert-x, because it rotates the UI by 90 degrees.)
+		 */
+		goodix,swap-x2y = <0>;
+		goodix,invert-x = <0>;
 		goodix,invert-y = <0>;
 		goodix,power-off-sleep = <0>;
 		goodix,pen-suppress-finger = <0>;
