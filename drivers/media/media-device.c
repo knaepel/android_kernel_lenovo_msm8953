@@ -100,6 +100,7 @@ static struct media_entity *find_entity(struct media_device *mdev, u32 id)
 
 #ifdef CONFIG_MSMB_CAMERA
 #include <media/msmb_camera.h>
+#include <media/v4l2-subdev.h>
 
 /*
  * Android 7 mm-camera userspace (e.g. Lenovo TB-X704) finds its nodes by
@@ -178,6 +179,19 @@ static void msm_camera_legacy_entity_desc(struct media_device *mdev,
 			entd->group_id = map[i].group_id;
 			break;
 		}
+	}
+
+	/*
+	 * msm-3.18 stored the subdev node number of the post processors in
+	 * entity.revision; the Android 7 pproc modules open
+	 * /dev/v4l-subdev<revision>.
+	 */
+	if (ent->function == MSM_CAMERA_SUBDEV_CPP ||
+	    ent->function == MSM_CAMERA_SUBDEV_VPE) {
+		struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(ent);
+
+		if (sd->devnode)
+			entd->revision = sd->devnode->num;
 	}
 }
 #endif
