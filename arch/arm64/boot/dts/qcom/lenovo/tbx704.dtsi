@@ -12,6 +12,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include "dsi-panel-nt51021b-inx-wuxga-video.dtsi"
 #include "dsi-panel-nt51021bboe-inx-wuxga-video.dtsi"
+#include "tbx704-camera.dtsi"
 
 / {
 	model = "Lenovo TAB4 10 Plus (TB-X704)";
