@@ -2996,9 +2996,23 @@ EXPORT_SYMBOL(q6asm_open_read_v3);
  * @bits_per_sample: bit width of capture session
  * @ts_mode: timestamp mode
  */
+/*
+ * Legacy ADSP images (AVS 2.7, e.g. Lenovo TB-X704 stock firmware) answer
+ * the PCM V4 media format with ADSP_EFAILED. Their ASM API is reported as
+ * V1 through the legacy version path; fall back to the V3 format there,
+ * like the vendor 3.18 kernel did for AVS 2.7.
+ */
+static bool q6asm_use_pcm_v3(void)
+{
+	return q6core_get_avcs_api_version_per_service(
+			APRV2_IDS_SERVICE_ID_ADSP_ASM_V) <= ADSP_ASM_API_VERSION_V1;
+}
+
 int q6asm_open_read_v4(struct audio_client *ac, uint32_t format,
 			uint16_t bits_per_sample, bool ts_mode)
 {
+	if (q6asm_use_pcm_v3())
+		return q6asm_open_read_v3(ac, format, bits_per_sample);
 	return __q6asm_open_read(ac, format, bits_per_sample,
 				 PCM_MEDIA_FORMAT_V4 /*media fmt block ver*/,
 				 ts_mode);
@@ -3338,6 +3352,8 @@ EXPORT_SYMBOL(q6asm_open_write_v3);
 int q6asm_open_write_v4(struct audio_client *ac, uint32_t format,
 			uint16_t bits_per_sample)
 {
+	if (q6asm_use_pcm_v3())
+		return q6asm_open_write_v3(ac, format, bits_per_sample);
 	return __q6asm_open_write(ac, format, bits_per_sample,
 				  ac->stream_id, false /*gapless*/,
 				  PCM_MEDIA_FORMAT_V4 /*pcm_format_block_ver*/);
@@ -4710,6 +4726,13 @@ int q6asm_enc_cfg_blk_pcm_v4(struct audio_client *ac,
 	u8 *channel_mapping;
 	u32 frames_per_buf = 0;
 	int rc;
+
+	if (q6asm_use_pcm_v3())
+		return q6asm_enc_cfg_blk_pcm_v3(ac, rate, channels,
+						bits_per_sample,
+						use_default_chmap,
+						use_back_flavor, channel_map,
+						sample_word_size);
 
 	if (!use_default_chmap && (channel_map == NULL)) {
 		pr_err("%s: No valid chan map and can't use default\n",
@@ -6664,6 +6687,13 @@ int q6asm_media_format_block_multi_ch_pcm_v4(struct audio_client *ac,
 					     uint16_t endianness,
 					     uint16_t mode)
 {
+	if (q6asm_use_pcm_v3())
+		return __q6asm_media_format_block_multi_ch_pcm_v3(ac, rate,
+							channels,
+							use_default_chmap,
+							channel_map,
+							bits_per_sample,
+							sample_word_size);
 	return __q6asm_media_format_block_multi_ch_pcm_v4(ac, rate, channels,
 							  use_default_chmap,
 							  channel_map,

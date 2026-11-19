@@ -478,7 +478,16 @@ static int q6core_send_get_avcs_fwk_ver_cmd(void)
 		 */
 		pr_err("%s: DSP returned error[%s]\n", __func__,
 		       adsp_err_get_err_str(-q6core_lcl.adsp_status));
-		ret = adsp_err_get_lnx_err_code(q6core_lcl.adsp_status);
+		/*
+		 * Older ADSP images (AVS 2.7) do not know the query; report it
+		 * like a cached VER_QUERY_UNSUPPORTED so callers take the legacy
+		 * path already on the first call.
+		 */
+		if (q6core_lcl.q6core_avcs_ver_info.status ==
+		    VER_QUERY_UNSUPPORTED)
+			ret = -EOPNOTSUPP;
+		else
+			ret = adsp_err_get_lnx_err_code(q6core_lcl.adsp_status);
 		goto done;
 	}
 
