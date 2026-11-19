@@ -550,6 +550,11 @@ int is_us_eu_switch_gpio_support(struct platform_device *pdev,
 		}
 		pdata->us_euro_gpio_p = of_parse_phandle(pdev->dev.of_node,
 						"qcom,cdc-us-eu-gpios", 0);
+		/* start in the default (non-swapped) position, driven low */
+		if (devm_gpio_request_one(&pdev->dev, pdata->us_euro_gpio,
+					  GPIOF_OUT_INIT_LOW, "us_eu_gpio"))
+			pr_err("%s: cannot request us_eu gpio %d\n", __func__,
+			       pdata->us_euro_gpio);
 		mbhc_cfg.swap_gnd_mic = msm8952_swap_gnd_mic;
 	}
 	return 0;

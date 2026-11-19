@@ -229,8 +229,41 @@
  * speaker amplifiers (gpio 96 and 23, Lenovo uses mode 5), internal
  * headset mic bias and Lenovo's microphone routing.
  */
+/*
+ * gpio 9 drives the US/EU (GND/MIC swap) switch of the headset jack, low by
+ * default as in Lenovo's kernel. Xiaomi's ant_check claimed it as a floating
+ * irq input: headphones played quietly with crackling, impedance read ~55k.
+ */
+&soc {
+	ant_check {
+		status = "disabled";
+	};
+};
+
+&cross_conn_det_act {
+	mux {
+		pins = "gpio9";
+	};
+
+	config {
+		pins = "gpio9";
+	};
+};
+
+&cross_conn_det_sus {
+	mux {
+		pins = "gpio9";
+	};
+
+	config {
+		pins = "gpio9";
+	};
+};
+
 &int_codec {
 	qcom,msm-spk-ext-pa = <&tlmm 96 0>;
+	qcom,cdc-us-euro-gpios = <&tlmm 9 0>;
+	qcom,cdc-us-eu-gpios = <&cdc_us_euro_sw>;
 	qcom,msm-spk-ext-pa1 = <&tlmm 23 0>;
 	qcom,msm-spk-ext-pa-pulses = <5>;
 	qcom,msm-mbhc-gnd-swh = <0>;
