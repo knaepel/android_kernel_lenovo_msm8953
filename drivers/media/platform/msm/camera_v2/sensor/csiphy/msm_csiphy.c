@@ -1320,6 +1320,10 @@ static int msm_csiphy_2phase_lane_config_v50(
 	return 0;
 }
 
+/* TB-X704: use the msm-3.18 userspace csiphy_clk (toggle at runtime) */
+static bool legacy_csiphy_clk = true;
+module_param(legacy_csiphy_clk, bool, 0644);
+
 static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 	struct msm_camera_csiphy_params *csiphy_params)
 {
@@ -1350,6 +1354,17 @@ static int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 	}
 
 	clk_rate = csiphy_dev->csiphy_max_clk;
+	/*
+	 * msm-3.18 userspace computes settle_cnt for the csiphy_clk it
+	 * requests; run the PHY at that clock like 3.18 did.
+	 */
+	if (legacy_csiphy_clk && msm_camera_legacy_abi &&
+	    (int)csiphy_params->csiphy_clk > 0)
+		clk_rate = csiphy_params->csiphy_clk;
+	pr_info("%s: csiphy%d lanes 0x%x cnt %d settle %d req_clk %u clk %ld\n",
+		__func__, csiphy_dev->pdev->id, csiphy_params->lane_mask,
+		csiphy_params->lane_cnt, csiphy_params->settle_cnt,
+		csiphy_params->csiphy_clk, clk_rate);
 	clk_rate = msm_camera_clk_set_rate(&csiphy_dev->pdev->dev,
 		csiphy_dev->csiphy_clk[csiphy_dev->csiphy_clk_index],
 		clk_rate);

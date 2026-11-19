@@ -241,8 +241,16 @@ static long msm_ispif_cmd_ext(struct v4l2_subdev *sd,
 		pcdata.size = pcdata64->size;
 		pcdata.data = pcdata64->data;
 	}
-	if (pcdata.size != sizeof(struct msm_ispif_param_data_ext)) {
-		pr_err("%s: payload size mismatch\n", __func__);
+	/*
+	 * The msm-3.18 userspace (Lenovo TB-X704 stock camera blobs) sends a
+	 * shorter payload without right_entries/stereo_enable/line_width.
+	 * Accept it; the missing tail stays zeroed (no stereo, no line width).
+	 */
+	if (pcdata.size != sizeof(struct msm_ispif_param_data_ext) &&
+	    pcdata.size != offsetof(struct msm_ispif_param_data_ext,
+				    right_entries)) {
+		pr_err("%s: payload size mismatch (%u)\n", __func__,
+		       pcdata.size);
 		return -EINVAL;
 	}
 
