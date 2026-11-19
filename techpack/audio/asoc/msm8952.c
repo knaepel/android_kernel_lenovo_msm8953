@@ -371,9 +371,12 @@ int is_ext_spk_gpio_support(struct platform_device *pdev,
 			struct msm_asoc_mach_data *pdata)
 {
 	const char *spk_ext_pa = "qcom,msm-spk-ext-pa";
+	const char *spk_ext_pa1 = "qcom,msm-spk-ext-pa1";
+	int ret;
 
 	pr_debug("%s:Enter\n", __func__);
 
+	pdata->spk_ext_pa1_gpio = -EINVAL;
 	pdata->spk_ext_pa_gpio = of_get_named_gpio(pdev->dev.of_node,
 				spk_ext_pa, 0);
 
@@ -387,7 +390,63 @@ int is_ext_spk_gpio_support(struct platform_device *pdev,
 			return -EINVAL;
 		}
 	}
+
+	/*
+	 * Boards with one-wire mode amplifiers (e.g. Lenovo TB-X704: two
+	 * amplifiers on gpio 96 and 23) select the gain by a number of
+	 * enable pulses and do not use a pinctrl node for the gpios.
+	 */
+	of_property_read_u32(pdev->dev.of_node, "qcom,msm-spk-ext-pa-pulses",
+			     &pdata->spk_ext_pa_pulses);
+	if (!pdata->spk_ext_pa_pulses || !gpio_is_valid(pdata->spk_ext_pa_gpio))
+		return 0;
+
+	ret = devm_gpio_request_one(&pdev->dev, pdata->spk_ext_pa_gpio,
+				    GPIOF_OUT_INIT_LOW, "spk_ext_pa");
+	if (ret) {
+		pr_err("%s: cannot request gpio %d: %d\n", __func__,
+		       pdata->spk_ext_pa_gpio, ret);
+		pdata->spk_ext_pa_gpio = -EINVAL;
+		return ret;
+	}
+
+	pdata->spk_ext_pa1_gpio = of_get_named_gpio(pdev->dev.of_node,
+				spk_ext_pa1, 0);
+	if (gpio_is_valid(pdata->spk_ext_pa1_gpio)) {
+		ret = devm_gpio_request_one(&pdev->dev,
+					    pdata->spk_ext_pa1_gpio,
+					    GPIOF_OUT_INIT_LOW, "spk_ext_pa1");
+		if (ret) {
+			pr_err("%s: cannot request gpio %d: %d\n", __func__,
+			       pdata->spk_ext_pa1_gpio, ret);
+			pdata->spk_ext_pa1_gpio = -EINVAL;
+		}
+	}
 	return 0;
+}
+
+static void spk_ext_pa_set(struct msm_asoc_mach_data *pdata, int value)
+{
+	gpio_set_value(pdata->spk_ext_pa_gpio, value);
+	if (gpio_is_valid(pdata->spk_ext_pa1_gpio))
+		gpio_set_value(pdata->spk_ext_pa1_gpio, value);
+}
+
+/* One-wire mode: N rising edges select the amplifier mode */
+static void spk_ext_pa_pulse(struct msm_asoc_mach_data *pdata)
+{
+	u32 i;
+
+	spk_ext_pa_set(pdata, 0);
+	usleep_range(1000, 1100);	/* > 0.5 ms low resets the mode */
+	for (i = 0; i < pdata->spk_ext_pa_pulses; i++) {
+		if (i) {
+			spk_ext_pa_set(pdata, 0);
+			udelay(2);
+		}
+		spk_ext_pa_set(pdata, 1);
+		udelay(2);
+	}
 }
 
 static int enable_spk_ext_pa(struct snd_soc_codec *codec, int enable)
@@ -404,6 +463,14 @@ static int enable_spk_ext_pa(struct snd_soc_codec *codec, int enable)
 
 	pr_debug("%s: %s external speaker PA\n", __func__,
 		enable ? "Enable" : "Disable");
+
+	if (pdata->spk_ext_pa_pulses) {
+		if (enable)
+			spk_ext_pa_pulse(pdata);
+		else
+			spk_ext_pa_set(pdata, 0);
+		return 0;
+	}
 
 	if (enable) {
 		ret =  msm_cdc_pinctrl_select_active_state(
