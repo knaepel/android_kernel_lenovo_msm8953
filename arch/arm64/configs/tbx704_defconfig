@@ -5134,3 +5134,6 @@ CONFIG_TOUCHSCREEN_GT9XX_v28=y
 # CONFIG_GOODIX_FINGERPRINT is not set
 # userspace may read the virtual counter (vDSO clock_gettime)
 CONFIG_ARM_ARCH_TIMER_VCT_ACCESS=y
+# blkio cgroup, used by the msm8953-common cgroups.json
+CONFIG_BLK_CGROUP=y
+CONFIG_CGROUP_WRITEBACK=y
