@@ -224,6 +224,38 @@
 	status = "disabled";
 };
 
+/*
+ * Internal codec as in Lenovo's stock device tree: two one-wire mode
+ * speaker amplifiers (gpio 96 and 23, Lenovo uses mode 5), internal
+ * headset mic bias and Lenovo's microphone routing.
+ */
+&int_codec {
+	qcom,msm-spk-ext-pa = <&tlmm 96 0>;
+	qcom,msm-spk-ext-pa1 = <&tlmm 23 0>;
+	qcom,msm-spk-ext-pa-pulses = <5>;
+	qcom,msm-mbhc-gnd-swh = <0>;
+	qcom,msm-hs-micbias-type = "internal";
+	/delete-property/ qcom,msm-micbias2-ext-cap;
+	qcom,audio-routing =
+		"RX_BIAS", "MCLK",
+		"SPK_RX_BIAS", "MCLK",
+		"INT_LDO_H", "MCLK",
+		"RX_I2S_CLK", "MCLK",
+		"TX_I2S_CLK", "MCLK",
+		"MIC BIAS External", "Secondary Mic",
+		"MIC BIAS Internal1", "Handset Mic",
+		"MIC BIAS Internal2", "Headset Mic",
+		"AMIC1", "MIC BIAS Internal1",
+		"AMIC2", "MIC BIAS Internal2",
+		"AMIC3", "MIC BIAS External",
+		"ADC1_IN", "ADC1_OUT",
+		"ADC2_IN", "ADC2_OUT",
+		"ADC3_IN", "ADC3_OUT",
+		"PDM_IN_RX1", "PDM_OUT_RX1",
+		"PDM_IN_RX2", "PDM_OUT_RX2",
+		"PDM_IN_RX3", "PDM_OUT_RX3";
+};
+
 /* Lenovo's Android 7 TrustZone cannot switch static context banks to AArch64 */
 &apps_iommu {
 	qcom,legacy-tz-pt-format;
