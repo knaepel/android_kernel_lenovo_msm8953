@@ -17,6 +17,7 @@
 #include "msm_sensor_driver.h"
 #include "msm_sensor.h"
 #include "msm_sd.h"
+#include "msm_cam_legacy_abi.h"
 
 /* Logging macro */
 #undef CDBG
@@ -58,7 +59,7 @@ static int msm_sensor_wait_for_probe_done(struct msm_sensor_init_t *s_init)
 
 /* Static function definition */
 static int32_t msm_sensor_driver_cmd(struct msm_sensor_init_t *s_init,
-	void *arg)
+	void *arg, bool legacy_abi)
 {
 	int32_t                      rc = 0;
 	struct sensor_init_cfg_data *cfg = (struct sensor_init_cfg_data *)arg;
@@ -75,7 +76,7 @@ static int32_t msm_sensor_driver_cmd(struct msm_sensor_init_t *s_init,
 		s_init->module_init_status = 0;
 		rc = msm_sensor_driver_probe(cfg->cfg.setting,
 			&cfg->probed_info,
-			cfg->entity_name);
+			cfg->entity_name, legacy_abi);
 		mutex_unlock(&s_init->imutex);
 		if (rc < 0)
 			pr_err_ratelimited("%s failed (non-fatal) rc %d",
@@ -115,7 +116,7 @@ static long msm_sensor_init_subdev_ioctl(struct v4l2_subdev *sd,
 
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_INIT_CFG:
-		rc = msm_sensor_driver_cmd(s_init, arg);
+		rc = msm_sensor_driver_cmd(s_init, arg, false);
 		break;
 
 	default:
@@ -154,6 +155,35 @@ static long msm_sensor_init_subdev_do_ioctl(
 		strlcpy(u32->entity_name, sensor_init_data.entity_name,
 			sizeof(sensor_init_data.entity_name));
 		return 0;
+	case VIDIOC_MSM_SENSOR_INIT_CFG32_LEGACY: {
+		/* 32-bit msm-3.18 daemon, see msm_cam_legacy_abi.h */
+		struct sensor_init_cfg_data32_legacy *l32 =
+			(struct sensor_init_cfg_data32_legacy *)arg;
+		struct msm_sensor_init_t *si = v4l2_get_subdevdata(sd);
+
+		MSM_CAM_LEGACY_ABI_CHECK();
+		if (!si)
+			return -EINVAL;
+		if (!msm_camera_legacy_abi) {
+			pr_info("msm-3.18 32-bit camera ABI in use");
+			msm_camera_legacy_abi = true;
+		}
+		memset(&sensor_init_data, 0, sizeof(sensor_init_data));
+		sensor_init_data.cfgtype = l32->cfgtype;
+		sensor_init_data.cfg.setting =
+			(__force void *)compat_ptr(l32->cfg.setting);
+		rc = msm_sensor_driver_cmd(si, &sensor_init_data, true);
+		if (rc < 0) {
+			pr_err_ratelimited("%s:%d legacy SENSOR_INIT_CFG failed (non-fatal)",
+				__func__, __LINE__);
+			return rc;
+		}
+		msm_sensor_info_to_legacy(&l32->probed_info,
+			&sensor_init_data.probed_info);
+		strlcpy(l32->entity_name, sensor_init_data.entity_name,
+			sizeof(l32->entity_name));
+		return 0;
+	}
 	default:
 		return msm_sensor_init_subdev_ioctl(sd, cmd, arg);
 	}

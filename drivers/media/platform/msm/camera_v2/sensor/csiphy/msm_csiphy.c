@@ -19,6 +19,7 @@
 #include <asm/div64.h>
 #include "msm_csiphy.h"
 #include "msm_sd.h"
+#include "msm_cam_legacy_abi.h"
 #include "include/msm_csiphy_2_0_hwreg.h"
 #include "include/msm_csiphy_2_2_hwreg.h"
 #include "include/msm_csiphy_3_0_hwreg.h"
@@ -2185,10 +2186,17 @@ static int32_t msm_csiphy_cmd(struct csiphy_device *csiphy_dev, void *arg)
 	case CSIPHY_INIT:
 		rc = msm_csiphy_init(csiphy_dev);
 		break;
-	case CSIPHY_CFG:
+	case CSIPHY_CFG: {
+		size_t size = sizeof(struct msm_camera_csiphy_params);
+
+#ifdef CONFIG_COMPAT
+		/* msm-3.18 32-bit daemon passes no data_rate */
+		if (msm_camera_legacy_abi && is_compat_task())
+			size = MSM_CSIPHY_PARAMS_LEGACY_SIZE;
+#endif
+		memset(&csiphy_params, 0, sizeof(csiphy_params));
 		if (copy_from_user(&csiphy_params,
-			(void __user *)cdata->cfg.csiphy_params,
-			sizeof(struct msm_camera_csiphy_params))) {
+			(void __user *)cdata->cfg.csiphy_params, size)) {
 			pr_err("%s: %d failed\n", __func__, __LINE__);
 			rc = -EFAULT;
 			break;
@@ -2199,6 +2207,7 @@ static int32_t msm_csiphy_cmd(struct csiphy_device *csiphy_dev, void *arg)
 		}
 		rc = msm_csiphy_lane_config(csiphy_dev, &csiphy_params);
 		break;
+	}
 	case CSIPHY_RELEASE:
 		if (copy_from_user(&csi_lane_params,
 			(void __user *)cdata->cfg.csi_lane_params,

@@ -19,6 +19,7 @@
 #include "msm_cci.h"
 #include "msm_camera_dt_util.h"
 #include "msm_sensor_driver.h"
+#include "msm_cam_legacy_abi.h"
 
 #include <soc/qcom/camera2.h>
 extern struct vendor_eeprom s_vendor_eeprom[CAMERA_VENDOR_EEPROM_COUNT_MAX];
@@ -814,8 +815,72 @@ int32_t msm_sensor_init_device_name(void)
 /* add sensor info for factory mode end by Brave*/
 
 /* static function definition */
+#ifdef CONFIG_COMPAT
+/* msm-3.18 32-bit slave info, see msm_cam_legacy_abi.h */
+static int32_t msm_sensor_get_slave_info_legacy(void *setting,
+	struct msm_camera_sensor_slave_info *slave_info)
+{
+	struct msm_camera_sensor_slave_info32_legacy *l32;
+
+	l32 = kzalloc(sizeof(*l32), GFP_KERNEL);
+	if (!l32)
+		return -ENOMEM;
+	if (copy_from_user(l32, (void __user *)setting, sizeof(*l32))) {
+		pr_err("failed: copy_from_user");
+		kfree(l32);
+		return -EFAULT;
+	}
+
+	strlcpy(slave_info->sensor_name, l32->sensor_name,
+		sizeof(slave_info->sensor_name));
+	strlcpy(slave_info->eeprom_name, l32->eeprom_name,
+		sizeof(slave_info->eeprom_name));
+	strlcpy(slave_info->actuator_name, l32->actuator_name,
+		sizeof(slave_info->actuator_name));
+	strlcpy(slave_info->ois_name, l32->ois_name,
+		sizeof(slave_info->ois_name));
+	strlcpy(slave_info->flash_name, l32->flash_name,
+		sizeof(slave_info->flash_name));
+
+	slave_info->camera_id = l32->camera_id;
+	slave_info->slave_addr = l32->slave_addr;
+	slave_info->i2c_freq_mode = l32->i2c_freq_mode;
+	slave_info->addr_type = l32->addr_type;
+	slave_info->sensor_id_info.sensor_id_reg_addr =
+		l32->sensor_id_info.sensor_id_reg_addr;
+	slave_info->sensor_id_info.sensor_id =
+		l32->sensor_id_info.sensor_id;
+	slave_info->sensor_id_info.sensor_id_mask =
+		l32->sensor_id_info.sensor_id_mask;
+	/* 3.18 knows no probe writes and no vendor id */
+	slave_info->sensor_id_info.setting.reg_setting = NULL;
+	slave_info->sensor_id_info.setting.size = 0;
+
+	slave_info->power_setting_array.size =
+		l32->power_setting_array.size;
+	slave_info->power_setting_array.size_down =
+		l32->power_setting_array.size_down;
+	slave_info->power_setting_array.power_setting =
+		(__force struct msm_sensor_power_setting *)
+		compat_ptr(l32->power_setting_array.power_setting);
+	slave_info->power_setting_array.power_down_setting =
+		(__force struct msm_sensor_power_setting *)
+		compat_ptr(l32->power_setting_array.power_down_setting);
+
+	slave_info->is_init_params_valid = l32->is_init_params_valid;
+	slave_info->sensor_init_params = l32->sensor_init_params;
+	slave_info->output_format = l32->output_format;
+	slave_info->bypass_video_node_creation =
+		!!l32->bypass_video_node_creation;
+
+	kfree(l32);
+	return 0;
+}
+#endif
+
 int32_t msm_sensor_driver_probe(void *setting,
-	struct msm_sensor_info_t *probed_info, char *entity_name)
+	struct msm_sensor_info_t *probed_info, char *entity_name,
+	bool legacy_abi)
 {
 	int32_t                              rc = 0;
 	struct msm_sensor_ctrl_t            *s_ctrl = NULL;
@@ -840,7 +905,11 @@ int32_t msm_sensor_driver_probe(void *setting,
 	if (!slave_info)
 		return -ENOMEM;
 #ifdef CONFIG_COMPAT
-	if (is_compat_task()) {
+	if (legacy_abi) {
+		rc = msm_sensor_get_slave_info_legacy(setting, slave_info);
+		if (rc < 0)
+			goto free_slave_info;
+	} else if (is_compat_task()) {
 		struct msm_camera_sensor_slave_info32 *slave_info32 =
 			kzalloc(sizeof(*slave_info32), GFP_KERNEL);
 		if (!slave_info32) {
@@ -1033,7 +1102,7 @@ int32_t msm_sensor_driver_probe(void *setting,
 			rc = -EFAULT;
 			goto free_slave_info;
 		}
-	} else {
+	} else if (!legacy_abi) {
 		slave_info->vendor_id_need_read = 1;
 	}
 

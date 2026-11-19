@@ -21,6 +21,7 @@
 #include "msm_camera_io_util.h"
 #include "cam_smmu_api.h"
 #include "msm_isp48.h"
+#include "msm_cam_legacy_abi.h"
 #define CREATE_TRACE_POINTS
 #include "trace/events/msm_cam.h"
 
@@ -1103,6 +1104,24 @@ static long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
 		mutex_unlock(&vfe_dev->realtime_mutex);
 		break;
 	}
+	/* 32-bit msm-3.18 daemon, see msm_cam_legacy_abi.h */
+	case VIDIOC_MSM_ISP_CFG_STREAM_LEGACY:
+		MSM_ISP_LEGACY_ABI_CHECK();
+		/* 4.9 layout is a prefix, hw_state is ignored */
+		return msm_isp_ioctl_unlocked(sd, VIDIOC_MSM_ISP_CFG_STREAM,
+			arg);
+	case VIDIOC_MSM_ISP_CFG_HW_STATE_LEGACY:
+		/* dual VFE sleep/awake bandwidth vote, not in 4.9 */
+		return 0;
+	case VIDIOC_MSM_ISP_AHB_CLK_CFG_LEGACY:
+		return msm_isp_ioctl_unlocked(sd, VIDIOC_MSM_ISP_AHB_CLK_CFG,
+			arg);
+	case VIDIOC_MSM_ISP_FETCH_ENG_MULTI_PASS_START_LEGACY:
+		return msm_isp_ioctl_unlocked(sd,
+			VIDIOC_MSM_ISP_FETCH_ENG_MULTI_PASS_START, arg);
+	case VIDIOC_MSM_ISP_MAP_BUF_START_MULTI_PASS_FE_LEGACY:
+		return msm_isp_ioctl_unlocked(sd,
+			VIDIOC_MSM_ISP_MAP_BUF_START_MULTI_PASS_FE, arg);
 	default:
 		return msm_isp_ioctl_unlocked(sd, cmd, arg);
 	}

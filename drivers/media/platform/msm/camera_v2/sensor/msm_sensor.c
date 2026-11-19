@@ -16,6 +16,7 @@
 #include "msm_cci.h"
 #include "msm_camera_io_util.h"
 #include "msm_camera_i2c_mux.h"
+#include "msm_cam_legacy_abi.h"
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
 #include <media/adsp-shmem-device.h>
@@ -470,6 +471,25 @@ static long msm_sensor_subdev_do_ioctl(
 	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 
 	switch (cmd) {
+	case VIDIOC_MSM_SENSOR_CFG32_LEGACY: {
+		/* 32-bit msm-3.18 daemon, see msm_cam_legacy_abi.h */
+		struct sensorb_cfg_data32_legacy *l32 =
+			(struct sensorb_cfg_data32_legacy *)arg;
+		struct sensorb_cfg_data32 cdata;
+		long rc;
+
+		MSM_CAM_LEGACY_ABI_CHECK();
+		memset(&cdata, 0, sizeof(cdata));
+		cdata.cfgtype = l32->cfgtype;
+		memcpy(&cdata.cfg, &l32->cfg, sizeof(l32->cfg));
+		rc = msm_sensor_subdev_ioctl(sd, VIDIOC_MSM_SENSOR_CFG, &cdata);
+		if (cdata.cfgtype == CFG_GET_SENSOR_INFO)
+			msm_sensor_info_to_legacy(&l32->cfg.sensor_info,
+				&cdata.cfg.sensor_info);
+		else
+			memcpy(&l32->cfg, &cdata.cfg, sizeof(l32->cfg));
+		return rc;
+	}
 	case VIDIOC_MSM_SENSOR_CFG32:
 		cmd = VIDIOC_MSM_SENSOR_CFG;
 	default:

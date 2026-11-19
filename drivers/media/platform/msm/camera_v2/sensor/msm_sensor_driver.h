@@ -16,6 +16,7 @@
 #include "msm_sensor.h"
 
 int32_t msm_sensor_driver_probe(void *setting,
-	struct msm_sensor_info_t *probed_info, char *entity_name);
+	struct msm_sensor_info_t *probed_info, char *entity_name,
+	bool legacy_abi);
 
 #endif

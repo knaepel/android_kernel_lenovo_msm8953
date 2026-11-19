@@ -19,8 +19,12 @@
 #include <soc/qcom/camera2.h>
 #include <linux/msm-bus.h>
 #include "msm_camera_io_util.h"
+#include "msm_cam_legacy_abi.h"
 
 #define BUFF_SIZE_128 128
+
+/* see msm_cam_legacy_abi.h */
+bool msm_camera_legacy_abi;
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
