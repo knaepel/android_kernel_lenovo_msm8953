@@ -77,6 +77,10 @@ static const int download_mode = 1;
 #endif
 
 int in_panic;
+
+/* bring-up aid: stop in fastboot after a panic, pstore stays intact */
+static bool panic_to_bootloader;
+module_param(panic_to_bootloader, bool, 0644);
 static int dload_type = SCM_DLOAD_FULLDUMP;
 static void *dload_mode_addr;
 static bool dload_mode_enabled;
@@ -283,13 +287,14 @@ static void msm_restart_prepare(const char *cmd)
 {
 	bool need_warm_reset = false;
 #ifdef CONFIG_QCOM_DLOAD_MODE
-	/* Write download mode flags if we're panic'ing
-	 * Write download mode flags if restart_mode says so
+	/* Write download mode flags if restart_mode says so
 	 * Kill download mode if master-kill switch is set
+	 *
+	 * Not on panic: the Lenovo TB-X704 bootloader turns a download mode
+	 * request into a cold reset, which loses pstore.
 	 */
 
-	set_dload_mode(download_mode &&
-			(in_panic || restart_mode == RESTART_DLOAD));
+	set_dload_mode(download_mode && restart_mode == RESTART_DLOAD);
 #endif
 
 	if (qpnp_pon_check_hard_reset_stored()) {
@@ -315,6 +320,11 @@ static void msm_restart_prepare(const char *cmd)
 		qpnp_pon_set_restart_reason(PON_RESTART_REASON_PANIC);
 #endif
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+		if (panic_to_bootloader) {
+			qpnp_pon_set_restart_reason(
+				PON_RESTART_REASON_BOOTLOADER);
+			__raw_writel(0x77665500, restart_reason);
+		}
 	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			qpnp_pon_set_restart_reason(
