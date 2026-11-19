@@ -98,18 +98,111 @@ static struct media_entity *find_entity(struct media_device *mdev, u32 id)
 	return NULL;
 }
 
+#ifdef CONFIG_MSMB_CAMERA
+#include <media/msmb_camera.h>
+
+/*
+ * Android 7 mm-camera userspace (e.g. Lenovo TB-X704) finds its nodes by
+ * the old entity type and group_id. Report the msm_config entities the way
+ * 3.18 kernels did: DEVNODE_V4L/V4L2_SUBDEV type and the old ids, which
+ * differ from the 4.9 MSM_CAMERA_SUBDEV_* function values.
+ */
+static bool msm_camera_legacy_mdev(struct media_device *mdev)
+{
+	return !strcmp(mdev->model, MSM_CONFIGURATION_NAME) ||
+	       !strcmp(mdev->model, MSM_CAMERA_NAME);
+}
+
+/*
+ * 3.18 numbered entities 1..n without gaps; that userspace enumerates by
+ * counting ids up until the first error. 4.9 shares the id counter with
+ * interfaces and links, so look plain (non-NEXT) ids up as 1-based index.
+ */
+static struct media_entity *msm_camera_legacy_find(struct media_device *mdev,
+						   u32 index)
+{
+	struct media_entity *entity;
+	u32 n = 0;
+
+	media_device_for_each_entity(entity, mdev)
+		if (++n == index)
+			return entity;
+	return NULL;
+}
+
+static void msm_camera_legacy_entity_desc(struct media_device *mdev,
+					  struct media_entity *ent,
+					  struct media_entity_desc *entd)
+{
+	static const struct {
+		u32 function;
+		u32 group_id;
+	} map[] = {
+		{ MSM_CAMERA_SUBDEV_CSIPHY,       0 },
+		{ MSM_CAMERA_SUBDEV_CSID,         1 },
+		{ MSM_CAMERA_SUBDEV_ISPIF,        2 },
+		{ MSM_CAMERA_SUBDEV_VFE,          3 },
+		{ MSM_CAMERA_SUBDEV_AXI,          4 },
+		{ MSM_CAMERA_SUBDEV_VPE,          5 },
+		{ MSM_CAMERA_SUBDEV_SENSOR,       6 },
+		{ MSM_CAMERA_SUBDEV_ACTUATOR,     7 },
+		{ MSM_CAMERA_SUBDEV_EEPROM,       8 },
+		{ MSM_CAMERA_SUBDEV_CPP,          9 },
+		{ MSM_CAMERA_SUBDEV_CCI,          10 },
+		{ MSM_CAMERA_SUBDEV_LED_FLASH,    11 },
+		{ MSM_CAMERA_SUBDEV_STROBE_FLASH, 12 },
+		{ MSM_CAMERA_SUBDEV_BUF_MNGR,     13 },
+		{ MSM_CAMERA_SUBDEV_SENSOR_INIT,  14 },
+		{ MSM_CAMERA_SUBDEV_OIS,          15 },
+		{ MSM_CAMERA_SUBDEV_FLASH,        16 },
+		{ MSM_CAMERA_SUBDEV_IR_LED,       17 },
+		{ MSM_CAMERA_SUBDEV_IR_CUT,       18 },
+		{ MSM_CAMERA_SUBDEV_EXT,          19 },
+	};
+	int i;
+
+	if (!msm_camera_legacy_mdev(mdev))
+		return;
+
+	if (!is_media_entity_v4l2_subdev(ent)) {
+		if (ent->function == QCAMERA_VNODE_GROUP_ID) {
+			entd->type = MEDIA_ENT_F_IO_V4L;	/* old DEVNODE_V4L */
+			entd->group_id = 2;	/* old QCAMERA_VNODE_GROUP_ID */
+		}
+		return;
+	}
+
+	entd->type = MEDIA_ENT_F_V4L2_SUBDEV_UNKNOWN;	/* old V4L2_SUBDEV */
+	for (i = 0; i < ARRAY_SIZE(map); i++) {
+		if (map[i].function == ent->function) {
+			entd->group_id = map[i].group_id;
+			break;
+		}
+	}
+}
+#endif
+
 static long media_device_enum_entities(struct media_device *mdev, void *arg)
 {
 	struct media_entity_desc *entd = arg;
 	struct media_entity *ent;
+	u32 req_id = entd->id;
+	bool legacy_index = false;
 
+#ifdef CONFIG_MSMB_CAMERA
+	if (msm_camera_legacy_mdev(mdev) &&
+	    !(req_id & MEDIA_ENT_ID_FLAG_NEXT)) {
+		ent = msm_camera_legacy_find(mdev, req_id);
+		legacy_index = true;
+	} else
+#endif
 	ent = find_entity(mdev, entd->id);
 	if (ent == NULL)
 		return -EINVAL;
 
 	memset(entd, 0, sizeof(*entd));
 
-	entd->id = media_entity_id(ent);
+	entd->id = legacy_index ? req_id : media_entity_id(ent);
 	if (ent->name)
 		strlcpy(entd->name, ent->name, sizeof(entd->name));
 	entd->type = ent->function;
@@ -137,6 +230,10 @@ static long media_device_enum_entities(struct media_device *mdev, void *arg)
 		else if (ent->function != MEDIA_ENT_F_IO_V4L)
 			entd->type = MEDIA_ENT_T_DEVNODE_UNKNOWN;
 	}
+
+#ifdef CONFIG_MSMB_CAMERA
+	msm_camera_legacy_entity_desc(mdev, ent, entd);
+#endif
 
 	memcpy(&entd->raw, &ent->info, sizeof(ent->info));
 
