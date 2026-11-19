@@ -51,6 +51,20 @@
 	reg = <0x83b00000 0x2800000>;
 };
 
+/*
+ * Firmware regions as in Lenovo's (and the QRD) memory map. The onclite
+ * tree moves wcnss_fw to 0x8ea00000; Lenovo's TrustZone expects WCNSS at
+ * 0x8e700000 and resets the SoC when the firmware is loaded elsewhere. The
+ * moved region also overlapped the ramoops buffer.
+ */
+&adsp_fw_mem {
+	reg = <0x0 0x8d600000 0x0 0x1100000>;
+};
+
+&wcnss_fw_mem {
+	reg = <0x0 0x8e700000 0x0 0x700000>;
+};
+
 /* vsmart panels in the shared panel list need a PMI632 we do not have */
 &mdss_mdp {
 	/delete-node/ qcom,mdss_dsi_ft8006p_hlt_1600_video;
